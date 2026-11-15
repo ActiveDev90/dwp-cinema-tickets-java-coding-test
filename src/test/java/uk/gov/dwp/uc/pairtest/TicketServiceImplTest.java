@@ -7,6 +7,22 @@ import org.junit.jupiter.api.Test;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest;
 import uk.gov.dwp.uc.pairtest.exception.InvalidPurchaseException;
 
+
+import thirdparty.paymentgateway.TicketPaymentService;
+import thirdparty.seatbooking.SeatReservationService;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+
+import org.mockito.InOrder;
+
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 public class TicketServiceImplTest {
 
@@ -347,6 +363,429 @@ public class TicketServiceImplTest {
                 )
         );
     }
+
+    // Mockito
+    @Test
+    void shouldProcessPaymentAndReserveSeatsForValidPurchase() {
+
+        // Arrange: Create mock implementations of both services.
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        // Inject the mocks into TicketServiceImpl.
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        // Create a valid purchase.
+        TicketTypeRequest adultRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.ADULT,
+                2
+        );
+
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                3
+        );
+
+        TicketTypeRequest infantRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.INFANT,
+                1
+        );
+
+        // Act: Attempt the purchase.
+        ticketService.purchaseTickets(
+                123L,
+                adultRequest,
+                childRequest,
+                infantRequest
+        );
+
+        // Assert: Verify the correct payment amount.
+        verify(paymentService).makePayment(123L, 95);
+
+        // Assert: Verify the correct number of reserved seats.
+        verify(seatReservationService).reserveSeat(123L, 5);
+    }
+
+
+    @Test
+    @DisplayName("Should Not Call External Services For Invalid Purchase")
+    void shouldNotCallExternalServicesForInvalidPurchase() {
+
+        // Arrange: Create mocked dependencies.
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        // Invalid purchase: children without an adult.
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                2
+        );
+
+        // Act and Assert: Purchase must be rejected.
+        assertThrows(
+                InvalidPurchaseException.class,
+                () -> ticketService.purchaseTickets(
+                        123L,
+                        childRequest
+                )
+        );
+
+        // Neither external service should have been called.
+        verifyNoInteractions(paymentService, seatReservationService);
+    }
+
+
+    @Test
+    @DisplayName("Should Process Payment Before Reserving Seats")
+    void shouldProcessPaymentBeforeReservingSeats() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        TicketTypeRequest adultRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.ADULT,
+                2
+        );
+
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                3
+        );
+
+        TicketTypeRequest infantRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.INFANT,
+                1
+        );
+
+        // Act
+        ticketService.purchaseTickets(
+                123L,
+                adultRequest,
+                childRequest,
+                infantRequest
+        );
+
+        // Assert: Verify the sequence of external calls.
+        InOrder inOrder = inOrder(
+                paymentService,
+                seatReservationService
+        );
+
+        inOrder.verify(paymentService).makePayment(123L, 95);
+
+        inOrder.verify(seatReservationService).reserveSeat(123L, 5);
+
+        // Ensure there were no additional service calls.
+        verifyNoMoreInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Allow Purchase Of Exactly 25 Tickets")
+    void shouldAllowPurchaseOfExactly25Tickets() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        TicketTypeRequest adultRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.ADULT,
+                20
+        );
+
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                4
+        );
+
+        TicketTypeRequest infantRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.INFANT,
+                1
+        );
+
+        // Total tickets = 20 + 4 + 1 = 25.
+        // Total amount = (20 * 25) + (4 * 15) = 560.
+        // Required seats = 20 + 4 = 24.
+
+        // Act
+        ticketService.purchaseTickets(
+                123L,
+                adultRequest,
+                childRequest,
+                infantRequest
+        );
+
+        // Assert
+        verify(paymentService).makePayment(123L, 560);
+
+        verify(seatReservationService).reserveSeat(123L, 24);
+
+        verifyNoMoreInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Aggregate Repeated Ticket Types")
+    void shouldAggregateRepeatedTicketTypes() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        // Act: Submit repeated ADULT and CHILD entries.
+        ticketService.purchaseTickets(
+                123L,
+                new TicketTypeRequest(TicketTypeRequest.Type.ADULT, 2),
+                new TicketTypeRequest(TicketTypeRequest.Type.CHILD, 2),
+                new TicketTypeRequest(TicketTypeRequest.Type.ADULT, 1),
+                new TicketTypeRequest(TicketTypeRequest.Type.INFANT, 1),
+                new TicketTypeRequest(TicketTypeRequest.Type.CHILD, 2)
+        );
+
+        // Assert:
+        // Adults = 3, Children = 4, Infants = 1.
+        // Payment = (3 * 25) + (4 * 15) = 135.
+        // Seats = 3 + 4 = 7.
+        verify(paymentService).makePayment(123L, 135);
+
+        verify(seatReservationService).reserveSeat(123L, 7);
+
+        verifyNoMoreInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Accept Adult Tickets Appearing Last")
+    void shouldAcceptAdultTicketAppearingLast() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        // Act: The adult request appears after the children
+        // and infant requests.
+        ticketService.purchaseTickets(
+                123L,
+                new TicketTypeRequest(TicketTypeRequest.Type.CHILD, 2),
+                new TicketTypeRequest(TicketTypeRequest.Type.INFANT, 1),
+                new TicketTypeRequest(TicketTypeRequest.Type.ADULT, 1)
+        );
+
+        // Assert:
+        // Payment = 25 + (2 * 15) = 55.
+        // Seats = 1 adult + 2 children = 3.
+        verify(paymentService).makePayment(123L, 55);
+
+        verify(seatReservationService).reserveSeat(123L, 3);
+
+        verifyNoMoreInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Use Provided Account ID For Payment And Reservation")
+    void shouldUseProvidedAccountIdForPaymentAndReservation() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        Long accountId = 987654321L;
+
+        TicketTypeRequest adultRequest =
+                new TicketTypeRequest(
+                        TicketTypeRequest.Type.ADULT,
+                        4
+                );
+
+        // Act
+        ticketService.purchaseTickets(accountId, adultRequest);
+
+        // Assert: Both services receive the same account ID.
+        verify(paymentService).makePayment(accountId, 100);
+
+        verify(seatReservationService).reserveSeat(accountId, 4);
+
+        verifyNoMoreInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Not Call External Services When Last Request Is Null")
+    void shouldNotCallExternalServicesWhenLastRequestIsNull() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        TicketTypeRequest adultRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.ADULT,
+                2
+        );
+
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                1
+        );
+
+        // Act and Assert
+        // The first two requests are valid.
+        // The final null request makes the purchase invalid.
+        assertThrows(
+                InvalidPurchaseException.class,
+                () -> ticketService.purchaseTickets(
+                        123L,
+                        adultRequest,
+                        childRequest,
+                        null
+                )
+        );
+
+        // Ensure no payment or reservation occurred.
+        verifyNoInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+    @Test
+    @DisplayName("Should Not Call External Services When Total Exceeds 25")
+    void shouldNotCallExternalServicesWhenTotalExceeds25() {
+
+        // Arrange
+        TicketPaymentService paymentService =
+                mock(TicketPaymentService.class);
+
+        SeatReservationService seatReservationService =
+                mock(SeatReservationService.class);
+
+        TicketService ticketService = new TicketServiceImpl(
+                paymentService,
+                seatReservationService
+        );
+
+        TicketTypeRequest adultRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.ADULT,
+                20
+        );
+
+        TicketTypeRequest childRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.CHILD,
+                4
+        );
+
+        TicketTypeRequest infantRequest = new TicketTypeRequest(
+                TicketTypeRequest.Type.INFANT,
+                2
+        );
+
+        // Total = 20 + 4 + 2 = 26.
+
+        // Act and Assert
+        assertThrows(
+                InvalidPurchaseException.class,
+                () -> ticketService.purchaseTickets(
+                        123L,
+                        adultRequest,
+                        childRequest,
+                        infantRequest
+                )
+        );
+
+        // No charge or seat reservation is permitted.
+        verifyNoInteractions(
+                paymentService,
+                seatReservationService
+        );
+    }
+
+
+
+
+
+
+
+
+
 
 
 

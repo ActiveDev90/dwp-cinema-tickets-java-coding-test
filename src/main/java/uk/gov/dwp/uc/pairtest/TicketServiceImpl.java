@@ -3,6 +3,15 @@ package uk.gov.dwp.uc.pairtest;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest;
 import uk.gov.dwp.uc.pairtest.exception.InvalidPurchaseException;
 
+
+import thirdparty.paymentgateway.TicketPaymentService;
+import thirdparty.paymentgateway.TicketPaymentServiceImpl;
+import thirdparty.seatbooking.SeatReservationService;
+import thirdparty.seatbooking.SeatReservationServiceImpl;
+
+import java.util.Objects;
+
+
 public class TicketServiceImpl implements TicketService {
     /**
      * Should only have private methods other than the one below.
@@ -10,9 +19,61 @@ public class TicketServiceImpl implements TicketService {
 
     private static final int MAX_TICKETS = 25;
 
-    @Override
-    public void purchaseTickets(Long accountId, TicketTypeRequest... ticketTypeRequests) throws InvalidPurchaseException {
 
+    private final TicketPaymentService paymentService;
+
+    private final SeatReservationService seatReservationService;
+
+
+    public TicketServiceImpl() {
+        this(
+                new TicketPaymentServiceImpl(),
+                new SeatReservationServiceImpl()
+        );
+    }
+
+    public TicketServiceImpl(
+            TicketPaymentService paymentService,
+            SeatReservationService seatReservationService
+    ) {
+        this.paymentService = Objects.requireNonNull(paymentService);
+        this.seatReservationService =
+                Objects.requireNonNull(seatReservationService);
+    }
+
+
+
+    @Override
+    public void purchaseTickets(Long accountId,
+                                TicketTypeRequest... ticketTypeRequests)
+            throws InvalidPurchaseException {
+
+        // Validate the complete purchase.
+        TicketBreakdown breakdown =
+                validatePurchase(accountId, ticketTypeRequests);
+
+        // Calculate the payment amount.
+        int totalAmount = breakdown.totalAmount();
+
+        // Calculate the number of seats required.
+        int seatsRequired = breakdown.seatsRequired();
+
+        // Process the payment.
+        paymentService.makePayment(accountId, totalAmount);
+
+        // Reserve the seats after payment.
+        seatReservationService.reserveSeat(accountId, seatsRequired);
+    }
+
+
+    /**
+     * Validates a purchase and returns its ticket breakdown.
+     * InvalidPurchaseException is thrown if the purchase is invalid
+     */
+    private TicketBreakdown validatePurchase(
+            Long accountId,
+            TicketTypeRequest... ticketTypeRequests
+    ) {
 
         // Rule 1: The account ID must be greater than zero.
         // Validate the account before processing a purchase.
@@ -68,6 +129,7 @@ public class TicketServiceImpl implements TicketService {
                 case CHILD -> childTickets += quantity;
                 case INFANT -> infantTickets += quantity;
             }
+        }
 
             // Rule 7: Child and infant tickets require an adult.
             if (adultTickets == 0
@@ -80,7 +142,15 @@ public class TicketServiceImpl implements TicketService {
             if (infantTickets > adultTickets) {
                 throw new InvalidPurchaseException();
             }
-        }
+
+
+            // Validation succeeded: return the quantities.
+            return new TicketBreakdown(
+                    adultTickets,
+                    childTickets,
+                    infantTickets
+            );
+
 
     }
 
