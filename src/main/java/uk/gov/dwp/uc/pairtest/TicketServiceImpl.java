@@ -78,13 +78,13 @@ public class TicketServiceImpl implements TicketService {
         // Rule 1: The account ID must be greater than zero.
         // Validate the account before processing a purchase.
         if (accountId == null || accountId <= 0) {
-            throw new InvalidPurchaseException();
+            throw new InvalidPurchaseException("Account ID must be a positive number.");
         }
 
         // Rule 2: A purchase must contain at least one
         // ticket request. A ticket must not be null or empty
         if (ticketTypeRequests == null || ticketTypeRequests.length == 0) {
-            throw new InvalidPurchaseException();
+            throw new InvalidPurchaseException("At least one ticket request is required.");
         }
 
         // Accumulate tickets across all request entries.
@@ -100,25 +100,25 @@ public class TicketServiceImpl implements TicketService {
 
             // Rule 3: Each ticket request must exist.
             if (request == null) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException("Ticket request cannot be null.");
             }
 
             // Rule 4: A ticket category must be specified.
             if (request.getTicketType() == null) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException("Ticket type is required.");
             }
 
             // Rule 5: Quantity must be positive.
             int quantity = request.getNoOfTickets();
 
             if (quantity <= 0) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException("Ticket quantity must be greater than zero.");
             }
 
             // Rule 6: Maximum 25 tickets per purchase.
             // Check before addition to prevent overflow.
             if (quantity > MAX_TICKETS - totalTickets) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException("A purchase cannot exceed 25 tickets.");
             }
 
             totalTickets += quantity;
@@ -134,13 +134,13 @@ public class TicketServiceImpl implements TicketService {
             // Rule 7: Child and infant tickets require an adult.
             if (adultTickets == 0
                     && (childTickets > 0 || infantTickets > 0)) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException("An adult ticket is required for child or infant tickets.");
             }
 
-            // Rule 8: Each infant needs a separate adult lap.
-            // This is our documented business assumption.
+            // Assumption: Each infant needs a separate adult lap.
             if (infantTickets > adultTickets) {
-                throw new InvalidPurchaseException();
+                throw new InvalidPurchaseException(
+                        "Infant ticket quantity cannot exceed adult ticket quantity.");
             }
 
 

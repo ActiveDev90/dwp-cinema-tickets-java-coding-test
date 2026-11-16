@@ -3,34 +3,26 @@ package uk.gov.dwp.uc.pairtest;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
+import org.mockito.InOrder;
+import thirdparty.paymentgateway.TicketPaymentService;
+import thirdparty.seatbooking.SeatReservationService;
 import uk.gov.dwp.uc.pairtest.domain.TicketTypeRequest;
 import uk.gov.dwp.uc.pairtest.exception.InvalidPurchaseException;
 
-
-import thirdparty.paymentgateway.TicketPaymentService;
-import thirdparty.seatbooking.SeatReservationService;
-
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-
-
-import org.mockito.InOrder;
-
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-
-
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
 public class TicketServiceImplTest {
 
     @Test
     @DisplayName("Should Reject Null Account ID")
     void shouldRejectNullAccountId() {
 
-        // Arrange: create our service.
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest request = new TicketTypeRequest(
@@ -38,7 +30,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act and Assert: a null account ID must be rejected.
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(null, request)
@@ -57,10 +48,14 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act and Assert
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(0L, request)
+        );
+
+        assertEquals(
+                "Account ID must be a positive number.",
+                exception.getMessage()
         );
     }
 
@@ -68,7 +63,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Negative Account ID")
     void shouldRejectNegativeAccountId() {
 
-        // Arrange
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest request = new TicketTypeRequest(
@@ -76,7 +70,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act and Assert
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(-1L, request)
@@ -93,12 +86,17 @@ public class TicketServiceImplTest {
 
         // Act and Assert: a null ticket request array
         // must be rejected even when the account is valid.
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
                         123L,
                         (TicketTypeRequest[]) null
                 )
+        );
+
+        assertEquals(
+                "At least one ticket request is required.",
+                exception.getMessage()
         );
     }
 
@@ -131,7 +129,7 @@ public class TicketServiceImplTest {
                         2
                 );
 
-        // The second element is deliberately null.
+        // The second element is null.
         TicketTypeRequest[] requests = {
                 adultRequest,
                 null
@@ -139,12 +137,17 @@ public class TicketServiceImplTest {
 
         // Act and Assert: reject the entire purchase
         // because one of its entries is null.
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
                         123L,
                         requests
                 )
+        );
+
+        assertEquals(
+                "Ticket request cannot be null.",
+                exception.getMessage()
         );
     }
 
@@ -162,9 +165,14 @@ public class TicketServiceImplTest {
         );
 
         // Act and Assert: ticket type must be specified.
-        assertThrows(
+        InvalidPurchaseException exception= assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L, request)
+        );
+
+        assertEquals(
+                "Ticket type is required.",
+                exception.getMessage()
         );
     }
 
@@ -181,9 +189,14 @@ public class TicketServiceImplTest {
         );
 
         // Act and Assert: zero quantities must be rejected.
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L, request)
+        );
+
+        assertEquals(
+                "Ticket quantity must be greater than zero.",
+                exception.getMessage()
         );
     }
 
@@ -218,9 +231,14 @@ public class TicketServiceImplTest {
                 26
         );
 
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L, request)
+        );
+
+        assertEquals(
+                "A purchase cannot exceed 25 tickets.",
+                exception.getMessage()
         );
     }
 
@@ -304,12 +322,17 @@ public class TicketServiceImplTest {
         );
 
         // Act and Assert
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
                         123L,
                         childRequest
                 )
+        );
+
+        assertEquals(
+                "An adult ticket is required for child or infant tickets.",
+                exception.getMessage()
         );
     }
 
@@ -354,7 +377,7 @@ public class TicketServiceImplTest {
 
         // Act and Assert
         // Assumption: each infant requires a separate adult lap.
-        assertThrows(
+        InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
                         123L,
@@ -362,10 +385,16 @@ public class TicketServiceImplTest {
                         infantRequest
                 )
         );
+
+        assertEquals(
+                "Infant ticket quantity cannot exceed adult ticket quantity.",
+                exception.getMessage()
+        );
     }
 
     // Mockito
     @Test
+    @DisplayName("Should Process Payment And Reserve Seats For Valid Purchase")
     void shouldProcessPaymentAndReserveSeatsForValidPurchase() {
 
         // Arrange: Create mock implementations of both services.
@@ -777,6 +806,8 @@ public class TicketServiceImplTest {
                 seatReservationService
         );
     }
+
+
 
 
 
