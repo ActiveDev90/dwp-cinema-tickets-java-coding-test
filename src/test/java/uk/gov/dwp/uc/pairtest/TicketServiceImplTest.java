@@ -104,10 +104,8 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Empty Ticket Requests")
     void shouldRejectEmptyTicketRequests() {
 
-        // Arrange
         TicketService ticketService = new TicketServiceImpl();
 
-        // Act and Assert: purchasing no tickets is invalid.
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L)
@@ -119,10 +117,8 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Null Ticket Request Entry")
     void shouldRejectNullTicketRequestEntry() {
 
-        // Arrange: create the service.
         TicketService ticketService = new TicketServiceImpl();
 
-        // Create a valid adult ticket request.
         TicketTypeRequest adultRequest =
                 new TicketTypeRequest(
                         TicketTypeRequest.Type.ADULT,
@@ -156,7 +152,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Null Ticket Type")
     void shouldRejectNullTicketType() {
 
-        // Arrange: create a request with no ticket category.
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest request = new TicketTypeRequest(
@@ -164,7 +159,6 @@ public class TicketServiceImplTest {
                 2
         );
 
-        // Act and Assert: ticket type must be specified.
         InvalidPurchaseException exception= assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L, request)
@@ -180,7 +174,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Zero Ticket Quantity")
     void shouldRejectZeroTicketQuantity() {
 
-        // Arrange: a customer requests zero adult tickets.
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest request = new TicketTypeRequest(
@@ -188,7 +181,6 @@ public class TicketServiceImplTest {
                 0
         );
 
-        // Act and Assert: zero quantities must be rejected.
         InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(123L, request)
@@ -313,7 +305,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Child Tickets Without Adult")
     void shouldRejectChildTicketsWithoutAdult() {
 
-        // Arrange
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest childRequest = new TicketTypeRequest(
@@ -321,7 +312,6 @@ public class TicketServiceImplTest {
                 2
         );
 
-        // Act and Assert
         InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
@@ -340,7 +330,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject Infant Tickets Without Adult")
     void shouldRejectInfantTicketsWithoutAdult() {
 
-        // Arrange
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest infantRequest = new TicketTypeRequest(
@@ -348,7 +337,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act and Assert
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
@@ -362,7 +350,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Reject More Infants Than Adults")
     void shouldRejectMoreInfantsThanAdults() {
 
-        // Arrange
         TicketService ticketService = new TicketServiceImpl();
 
         TicketTypeRequest adultRequest = new TicketTypeRequest(
@@ -375,7 +362,6 @@ public class TicketServiceImplTest {
                 2
         );
 
-        // Act and Assert
         // Assumption: each infant requires a separate adult lap.
         InvalidPurchaseException exception = assertThrows(
                 InvalidPurchaseException.class,
@@ -392,25 +378,21 @@ public class TicketServiceImplTest {
         );
     }
 
-    // Mockito
     @Test
     @DisplayName("Should Process Payment And Reserve Seats For Valid Purchase")
     void shouldProcessPaymentAndReserveSeatsForValidPurchase() {
 
-        // Arrange: Create mock implementations of both services.
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
         SeatReservationService seatReservationService =
                 mock(SeatReservationService.class);
 
-        // Inject the mocks into TicketServiceImpl.
         TicketService ticketService = new TicketServiceImpl(
                 paymentService,
                 seatReservationService
         );
 
-        // Create a valid purchase.
         TicketTypeRequest adultRequest = new TicketTypeRequest(
                 TicketTypeRequest.Type.ADULT,
                 2
@@ -426,7 +408,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act: Attempt the purchase.
         ticketService.purchaseTickets(
                 123L,
                 adultRequest,
@@ -434,10 +415,8 @@ public class TicketServiceImplTest {
                 infantRequest
         );
 
-        // Assert: Verify the correct payment amount.
         verify(paymentService).makePayment(123L, 95);
 
-        // Assert: Verify the correct number of reserved seats.
         verify(seatReservationService).reserveSeat(123L, 5);
     }
 
@@ -446,7 +425,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Not Call External Services For Invalid Purchase")
     void shouldNotCallExternalServicesForInvalidPurchase() {
 
-        // Arrange: Create mocked dependencies.
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -458,13 +436,11 @@ public class TicketServiceImplTest {
                 seatReservationService
         );
 
-        // Invalid purchase: children without an adult.
         TicketTypeRequest childRequest = new TicketTypeRequest(
                 TicketTypeRequest.Type.CHILD,
                 2
         );
 
-        // Act and Assert: Purchase must be rejected.
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
@@ -473,7 +449,7 @@ public class TicketServiceImplTest {
                 )
         );
 
-        // Neither external service should have been called.
+        // Neither external service should be called.
         verifyNoInteractions(paymentService, seatReservationService);
     }
 
@@ -482,7 +458,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Process Payment Before Reserving Seats")
     void shouldProcessPaymentBeforeReservingSeats() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -509,7 +484,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act
         ticketService.purchaseTickets(
                 123L,
                 adultRequest,
@@ -517,7 +491,6 @@ public class TicketServiceImplTest {
                 infantRequest
         );
 
-        // Assert: Verify the sequence of external calls.
         InOrder inOrder = inOrder(
                 paymentService,
                 seatReservationService
@@ -527,7 +500,6 @@ public class TicketServiceImplTest {
 
         inOrder.verify(seatReservationService).reserveSeat(123L, 5);
 
-        // Ensure there were no additional service calls.
         verifyNoMoreInteractions(
                 paymentService,
                 seatReservationService
@@ -539,7 +511,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Allow Purchase Of Exactly 25 Tickets")
     void shouldAllowPurchaseOfExactly25Tickets() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -570,7 +541,6 @@ public class TicketServiceImplTest {
         // Total amount = (20 * 25) + (4 * 15) = 560.
         // Required seats = 20 + 4 = 24.
 
-        // Act
         ticketService.purchaseTickets(
                 123L,
                 adultRequest,
@@ -578,7 +548,6 @@ public class TicketServiceImplTest {
                 infantRequest
         );
 
-        // Assert
         verify(paymentService).makePayment(123L, 560);
 
         verify(seatReservationService).reserveSeat(123L, 24);
@@ -594,7 +563,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Aggregate Repeated Ticket Types")
     void shouldAggregateRepeatedTicketTypes() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -606,7 +574,6 @@ public class TicketServiceImplTest {
                 seatReservationService
         );
 
-        // Act: Submit repeated ADULT and CHILD entries.
         ticketService.purchaseTickets(
                 123L,
                 new TicketTypeRequest(TicketTypeRequest.Type.ADULT, 2),
@@ -635,7 +602,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Accept Adult Tickets Appearing Last")
     void shouldAcceptAdultTicketAppearingLast() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -647,8 +613,6 @@ public class TicketServiceImplTest {
                 seatReservationService
         );
 
-        // Act: The adult request appears after the children
-        // and infant requests.
         ticketService.purchaseTickets(
                 123L,
                 new TicketTypeRequest(TicketTypeRequest.Type.CHILD, 2),
@@ -656,7 +620,6 @@ public class TicketServiceImplTest {
                 new TicketTypeRequest(TicketTypeRequest.Type.ADULT, 1)
         );
 
-        // Assert:
         // Payment = 25 + (2 * 15) = 55.
         // Seats = 1 adult + 2 children = 3.
         verify(paymentService).makePayment(123L, 55);
@@ -674,7 +637,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Use Provided Account ID For Payment And Reservation")
     void shouldUseProvidedAccountIdForPaymentAndReservation() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -694,10 +656,8 @@ public class TicketServiceImplTest {
                         4
                 );
 
-        // Act
         ticketService.purchaseTickets(accountId, adultRequest);
 
-        // Assert: Both services receive the same account ID.
         verify(paymentService).makePayment(accountId, 100);
 
         verify(seatReservationService).reserveSeat(accountId, 4);
@@ -713,7 +673,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Not Call External Services When Last Request Is Null")
     void shouldNotCallExternalServicesWhenLastRequestIsNull() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -735,7 +694,6 @@ public class TicketServiceImplTest {
                 1
         );
 
-        // Act and Assert
         // The first two requests are valid.
         // The final null request makes the purchase invalid.
         assertThrows(
@@ -748,7 +706,6 @@ public class TicketServiceImplTest {
                 )
         );
 
-        // Ensure no payment or reservation occurred.
         verifyNoInteractions(
                 paymentService,
                 seatReservationService
@@ -760,7 +717,6 @@ public class TicketServiceImplTest {
     @DisplayName("Should Not Call External Services When Total Exceeds 25")
     void shouldNotCallExternalServicesWhenTotalExceeds25() {
 
-        // Arrange
         TicketPaymentService paymentService =
                 mock(TicketPaymentService.class);
 
@@ -789,7 +745,6 @@ public class TicketServiceImplTest {
 
         // Total = 20 + 4 + 2 = 26.
 
-        // Act and Assert
         assertThrows(
                 InvalidPurchaseException.class,
                 () -> ticketService.purchaseTickets(
@@ -800,7 +755,6 @@ public class TicketServiceImplTest {
                 )
         );
 
-        // No charge or seat reservation is permitted.
         verifyNoInteractions(
                 paymentService,
                 seatReservationService
